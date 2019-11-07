@@ -1,0 +1,18 @@
+$HostIP = (
+    Get-NetIPConfiguration |
+    Where-Object {
+        $_.IPv4DefaultGateway -ne $null -and
+        $_.NetAdapter.Status -ne "Disconnected"
+    }
+).IPv4Address.IPAddress # get local ipv4
+
+if($HostIP -ne $null) { # check if network is not null
+    netsh interface portproxy add v4tov4 listenport=8080 connectport=80 connectaddress=$HostIP
+    Auditpol /set /category:"System" /SubCategory:"Filtering Platform Packet Drop" /success:enable /failure:enable
+    Auditpol /set /category:"System" /SubCategory:"Filtering Platform Connection" /success:enable /failure:enable
+    wevtutil qe Security "/q:*[System [(EventID=2002)]]" /f:text /rd:true /c:1 > C:\2002.txt
+    wevtutil qe Security "/q:*[System [(EventID=2004)]]" /f:text /rd:true /c:1 > C:\2004.txt
+    wevtutil qe Security "/q:*[System [(EventID=2005)]]" /f:text /rd:true /c:1 > C:\2005.txt
+} else {
+    Write-Host "[ERROR] Network disconnected, shutting off." # log if no network found
+}
